@@ -1,8 +1,8 @@
 #!/bin/bash
-OUTPUT_DIR=/data/joe/test_decsum/transformers/
-YELP_OUTPUT_DIR=/data/joe/test_decsum/ # output dir of preprocessing step
+OUTPUT_DIR=/content/decsum/data/transformers
+YELP_OUTPUT_DIR=/content/decsum/yelp_dataset_preprocessed # output dir of preprocessing step
 DATA_DIR=${YELP_OUTPUT_DIR}/50reviews/
-CACHE_DIR=/data/joe/test_decsum/transformers_cache/
+CACHE_DIR=/content/decsum/data/transformers_cache/
 
 python -m models.transformers.main \
     --max_epochs 3 \
