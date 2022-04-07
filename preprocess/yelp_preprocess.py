@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 import logging
 import pandas as pd
+import numpy as np
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 logging.info('Admin logged in')
@@ -45,6 +46,24 @@ def convert_data(input_file, output_file):
             business_dict[b].sort()
             fout.write("%s\n" % json.dumps(
                 {"business": b, "reviews": business_dict[b]}))
+
+
+def get_split_ids(reviews):
+    """
+    Create split ids for each review
+    """
+    ixs = np.arange(len(reviews))
+
+    business_ids = [x['business'] for x in reviews]
+
+    reviews = np.array(business_ids)
+
+    np.random.shuffle(ixs)
+
+    split_ids = {'train': list(reviews[ixs[:10]]),
+                 'dev': list(reviews[ixs[10:20]]), 'test': list(reviews[ixs[20:30]])}
+
+    return split_ids
 
 
 if __name__ == "__main__":
@@ -129,16 +148,18 @@ if __name__ == "__main__":
                 for o in obj:
                     fout.write("%s\n" % json.dumps(o))
 
-        splits = ["train", "dev", "test"]
-        split_ids = {}
-        for s in splits:
-            split_ids[s] = set(pd.read_csv(
-                f"preprocess/{s}_business_ids.csv").business.values)
-
         reviews = []
         with gzip.open(out_file, 'rt') as f:
             for line in f:
                 reviews.append(json.loads(line))
+
+        split_ids = get_split_ids(reviews)
+
+        # splits = ["train", "dev", "test"]
+        # split_ids = {}
+        # for s in splits:
+        #     split_ids[s] = set(pd.read_csv(
+        #         f"preprocess/{s}_business_ids.csv").business.values)
 
         for split, ids in split_ids.items():
             split_reviews = []
