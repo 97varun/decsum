@@ -1,22 +1,11 @@
 
-import logging
-logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO
-    )
-import argparse
-import os
-from pathlib import Path
-from typing import Any, Dict
-
-import torch
-import pytorch_lightning as pl
-from pytorch_lightning.utilities import rank_zero_info
-
-from models.transformers.dataloader import TransformerYelpDataset
-from models.utils import load_jsonl_gz
-
+from transformers.optimization import (
+    Adafactor,
+    get_cosine_schedule_with_warmup,
+    get_cosine_with_hard_restarts_schedule_with_warmup,
+    get_linear_schedule_with_warmup,
+    get_polynomial_decay_schedule_with_warmup,
+)
 from transformers import (
     AdamW,
     AutoConfig,
@@ -31,12 +20,20 @@ from transformers import (
     PretrainedConfig,
     PreTrainedTokenizer,
 )
-from transformers.optimization import (
-    Adafactor,
-    get_cosine_schedule_with_warmup,
-    get_cosine_with_hard_restarts_schedule_with_warmup,
-    get_linear_schedule_with_warmup,
-    get_polynomial_decay_schedule_with_warmup,
+from models.utils import load_jsonl_gz
+from models.transformers.dataloader import TransformerYelpDataset
+from pytorch_lightning.utilities import rank_zero_info
+import pytorch_lightning as pl
+import torch
+from typing import Any, Dict
+from pathlib import Path
+import os
+import argparse
+import logging
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
+    datefmt="%m/%d/%Y %H:%M:%S",
+    level=logging.INFO
 )
 
 
@@ -83,7 +80,7 @@ class Transformer_PL(pl.LightningModule):
         # TODO: move to self.save_hyperparameters()
         # self.save_hyperparameters()
         # can also expand arguments into trainer signature for easier reading
-        mode="sequence-classification"
+        mode = "sequence-classification"
 
         self.save_hyperparameters(hparams)
         logger.info(f"Number of Labels: {self.hparams.num_labels}")
@@ -101,10 +98,12 @@ class Transformer_PL(pl.LightningModule):
         else:
             self.config: PretrainedConfig = config
 
-        extra_model_params = ("encoder_layerdrop", "decoder_layerdrop", "dropout", "attention_dropout")
+        extra_model_params = (
+            "encoder_layerdrop", "decoder_layerdrop", "dropout", "attention_dropout")
         for p in extra_model_params:
             if getattr(self.hparams, p, None):
-                assert hasattr(self.config, p), f"model config doesn't have a `{p}` attribute"
+                assert hasattr(
+                    self.config, p), f"model config doesn't have a `{p}` attribute"
                 setattr(self.config, p, getattr(self.hparams, p))
 
         if tokenizer is None:
@@ -120,7 +119,7 @@ class Transformer_PL(pl.LightningModule):
                 self.hparams.model_name_or_path,
                 from_tf=bool(".ckpt" in self.hparams.model_name_or_path),
                 config=self.config,
-                cache_dir=cache_dir, # save server storage
+                cache_dir=cache_dir,  # save server storage
             )
         else:
             self.model = model
@@ -133,7 +132,8 @@ class Transformer_PL(pl.LightningModule):
         scheduler = get_schedule_func(
             self.opt, num_warmup_steps=self.hparams.warmup_steps, num_training_steps=self.total_steps
         )
-        scheduler = {"scheduler": scheduler, "interval": "step", "frequency": 1}
+        scheduler = {"scheduler": scheduler,
+                     "interval": "step", "frequency": 1}
         return scheduler
 
     def configure_optimizers(self):
@@ -161,7 +161,7 @@ class Transformer_PL(pl.LightningModule):
             )
         self.opt = optimizer
 
-        self.train_loader = getattr(self,"train_loader",None)
+        self.train_loader = getattr(self, "train_loader", None)
         if self.train_loader:
             scheduler = self.get_lr_scheduler()
         else:
@@ -172,34 +172,40 @@ class Transformer_PL(pl.LightningModule):
         return self.model(**inputs)
 
     def training_step(self, batch, batch_idx):
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+        inputs = {"input_ids": batch[0],
+                  "attention_mask": batch[1], "labels": batch[3]}
 
         if self.config.model_type != "distilbert":
-            inputs["token_type_ids"] = batch[2] if self.config.model_type in ["bert", "xlnet", "albert"] else None
+            inputs["token_type_ids"] = batch[2] if self.config.model_type in [
+                "bert", "xlnet", "albert"] else None
 
         outputs = self(**inputs)
-        loss= outputs[0]
+        loss = outputs[0]
 
         lr_scheduler = self.trainer.lr_schedulers[0]["scheduler"]
         self.log('train_loss', loss, prog_bar=True)
-        self.log( "rate", lr_scheduler.get_last_lr()[-1])
+        self.log("rate", lr_scheduler.get_last_lr()[-1])
         return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+        inputs = {"input_ids": batch[0],
+                  "attention_mask": batch[1], "labels": batch[3]}
 
         if self.config.model_type != "distilbert":
-            inputs["token_type_ids"] = batch[2] if self.config.model_type in ["bert", "xlnet", "albert"] else None
+            inputs["token_type_ids"] = batch[2] if self.config.model_type in [
+                "bert", "xlnet", "albert"] else None
 
         outputs = self(**inputs)
         tmp_eval_loss, logits = outputs[:2]
         self.log('val_loss', tmp_eval_loss)
 
     def test_step(self, batch, batch_nb):
-        inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
+        inputs = {"input_ids": batch[0],
+                  "attention_mask": batch[1], "labels": batch[3]}
 
         if self.config.model_type != "distilbert":
-            inputs["token_type_ids"] = batch[2] if self.config.model_type in ["bert", "xlnet", "albert"] else None
+            inputs["token_type_ids"] = batch[2] if self.config.model_type in [
+                "bert", "xlnet", "albert"] else None
 
         outputs = self(**inputs)
         tmp_eval_loss, logits = outputs[:2]
@@ -212,26 +218,31 @@ class Transformer_PL(pl.LightningModule):
     def total_steps(self) -> int:
         """The number of total training steps that will be run. Used for lr scheduler purposes."""
         num_devices = max(1, self.hparams.gpus)  # TODO: consider num_tpu_cores
-        effective_batch_size = self.hparams.train_batch_size * self.hparams.accumulate_grad_batches * num_devices
+        effective_batch_size = self.hparams.train_batch_size * \
+            self.hparams.accumulate_grad_batches * num_devices
         dataset_size = len(self.train_loader.dataset)
         return (dataset_size / effective_batch_size) * self.hparams.max_epochs
 
     def setup(self, mode):
         if mode == "fit":
-            self.train_loader = self.get_dataloader("train", self.hparams.train_batch_size, shuffle=True)
+            self.train_loader = self.get_dataloader(
+                "train", self.hparams.train_batch_size, shuffle=True)
 
     def get_dataloader(self, type_path, batch_size, shuffle=False):
         # todo add dataset path
-        data_filepath = os.path.join(self.hparams.data_dir, type_path+".jsonl.gz")
+        data_filepath = os.path.join(
+            self.hparams.data_dir, type_path+".jsonl.gz")
         data = load_jsonl_gz(data_filepath)
-        yelp = TransformerYelpDataset(self.tokenizer,data,self.hparams.max_seq_length)
-        logger.info(f"Loading {type_path} dataset with length {len(yelp)} from {data_filepath}")
+        yelp = TransformerYelpDataset(
+            self.tokenizer, data, self.hparams.max_seq_length)
+        logger.info(
+            f"Loading {type_path} dataset with length {len(yelp)} from {data_filepath}")
         data_loader = torch.utils.data.DataLoader(dataset=yelp,
-                                                batch_size=batch_size,
-                                                shuffle=shuffle,
-                                                num_workers=self.hparams.num_workers,
-                                                collate_fn=yelp.collate_fn)
-        
+                                                  batch_size=batch_size,
+                                                  shuffle=shuffle,
+                                                  num_workers=self.hparams.num_workers,
+                                                  collate_fn=yelp.collate_fn)
+
         return data_loader
 
     def train_dataloader(self):
@@ -242,7 +253,6 @@ class Transformer_PL(pl.LightningModule):
 
     def test_dataloader(self):
         return self.get_dataloader("test", self.hparams.eval_batch_size, shuffle=False)
-
 
     @pl.utilities.rank_zero_only
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
@@ -301,7 +311,8 @@ class Transformer_PL(pl.LightningModule):
             type=float,
             help="Attention dropout probability (Optional). Goes into model.config",
         )
-        parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
+        parser.add_argument("--learning_rate", default=5e-5,
+                            type=float, help="The initial learning rate for Adam.")
         parser.add_argument(
             "--lr_scheduler",
             default="linear",
@@ -310,13 +321,18 @@ class Transformer_PL(pl.LightningModule):
             type=str,
             help="Learning rate scheduler",
         )
-        parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-        parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-        parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
-        parser.add_argument("--num_workers", default=16, type=int, help="kwarg passed to DataLoader")
-        parser.add_argument("--num_train_epochs", dest="max_epochs", default=3, type=int)
-        parser.add_argument("--train_batch_size", default=4, type=int)
-        parser.add_argument("--eval_batch_size", default=4, type=int)
+        parser.add_argument("--weight_decay", default=0.0,
+                            type=float, help="Weight decay if we apply some.")
+        parser.add_argument("--adam_epsilon", default=1e-8,
+                            type=float, help="Epsilon for Adam optimizer.")
+        parser.add_argument("--warmup_steps", default=0,
+                            type=int, help="Linear warmup over warmup_steps.")
+        parser.add_argument("--num_workers", default=16,
+                            type=int, help="kwarg passed to DataLoader")
+        parser.add_argument("--num_train_epochs",
+                            dest="max_epochs", default=3, type=int)
+        parser.add_argument("--train_batch_size", default=1, type=int)
+        parser.add_argument("--eval_batch_size", default=1, type=int)
         parser.add_argument("--adafactor", action="store_true")
 
         return parser
