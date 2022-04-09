@@ -20,6 +20,11 @@ pp = pprint.PrettyPrinter(indent=4)
 myprint = pp.pprint
 DATE_PATTERN = "%Y-%m-%d %H:%M:%S"
 
+# These values are takes from {dev/train/test}_business_ids.csv
+DEV_SET_SIZE = 2898
+TEST_SET_SIZE = 3623
+TRAIN_SET_SIZE = 11591
+
 
 def get_created_time(text):
     return int(datetime.strptime(text, DATE_PATTERN).strftime("%s"))
@@ -60,8 +65,9 @@ def get_split_ids(reviews):
 
     np.random.shuffle(ixs)
 
-    split_ids = {'train': list(reviews[ixs[:10]]),
-                 'dev': list(reviews[ixs[10:20]]), 'test': list(reviews[ixs[20:30]])}
+    split_ids = {'train': list(reviews[ixs[:TRAIN_SET_SIZE]]),
+                 'dev': list(reviews[ixs[TRAIN_SET_SIZE:TRAIN_SET_SIZE + DEV_SET_SIZE]]),
+                 'test': list(reviews[ixs[TRAIN_SET_SIZE + DEV_SET_SIZE:TRAIN_SET_SIZE + DEV_SET_SIZE + TEST_SET_SIZE]])}
 
     return split_ids
 
