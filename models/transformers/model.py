@@ -331,8 +331,8 @@ class Transformer_PL(pl.LightningModule):
                             type=int, help="kwarg passed to DataLoader")
         parser.add_argument("--num_train_epochs",
                             dest="max_epochs", default=3, type=int)
-        parser.add_argument("--train_batch_size", default=1, type=int)
-        parser.add_argument("--eval_batch_size", default=1, type=int)
+        parser.add_argument("--train_batch_size", default=2, type=int)
+        parser.add_argument("--eval_batch_size", default=2, type=int)
         parser.add_argument("--adafactor", action="store_true")
 
         return parser
