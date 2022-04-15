@@ -1,7 +1,7 @@
 #!/bin/bash
 set -x
 
-OUTPUT_DIR=/data/joe/test_decsum/
+OUTPUT_DIR=../drive/MyDrive/ColabNotebooks/data
 MODEL_PATH=${OUTPUT_DIR}/transformers/version_27-12-2021--16-59-15/checkpoints/epoch=1-val_loss=0.12.ckpt
 RES_DIR=${OUTPUT_DIR}/models/sentence_select/
 

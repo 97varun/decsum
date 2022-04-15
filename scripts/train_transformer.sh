@@ -1,8 +1,8 @@
 #!/bin/bash
-OUTPUT_DIR=/content/decsum/data/transformers
-YELP_OUTPUT_DIR=/content/decsum/yelp_dataset_preprocessed # output dir of preprocessing step
+OUTPUT_DIR=../drive/MyDrive/ColabNotebooks/data/transformers
+YELP_OUTPUT_DIR=../drive/MyDrive/ColabNotebooks/data # output dir of preprocessing step
 DATA_DIR=${YELP_OUTPUT_DIR}/50reviews/
-CACHE_DIR=/content/decsum/data/transformers_cache/
+CACHE_DIR=../drive/MyDrive/ColabNotebooks/data/transformers_cache/
 
 python -m models.transformers.main \
     --max_epochs 3 \
@@ -14,3 +14,5 @@ python -m models.transformers.main \
     --do_train \
     --cache_dir $CACHE_DIR \
     --fp16
+
+
